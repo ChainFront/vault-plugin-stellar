@@ -1,3 +1,3 @@
 # Vault Plugin: Stellar Secrets Backend
 
-This is a backend plugin to be used with Hashicorp Vault. This plugin manage secret keys for the Stellar blockchain platform.
+This is a backend secrets plugin to be used with Hashicorp Vault. This plugin manages secret keys for the Stellar blockchain platform.
