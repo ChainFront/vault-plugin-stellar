@@ -27,6 +27,7 @@ func Backend(c *logical.BackendConfig) *backend {
 		Help: "",
 		Paths: framework.PathAppend(
 			accountsPaths(&b),
+			paymentsPaths(&b),
 		),
 		PathsSpecial: &logical.Paths{},
 		Secrets:      []*framework.Secret{},

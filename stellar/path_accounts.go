@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
+	"github.com/stellar/go/clients/horizon"
 	"github.com/stellar/go/keypair"
 )
 
@@ -92,10 +93,34 @@ func (b *backend) createAccount(ctx context.Context, req *logical.Request, d *fr
 }
 
 func (b *backend) readAccount(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	log.Print("Reading account...")
-	entry, err := req.Storage.Get(ctx, req.Path)
+
+	vaultAccount, err := b.readVaultAccount(ctx, req, req.Path)
+	address := &vaultAccount.Address
+
+	stellarAccount, err := horizon.DefaultTestNetClient.LoadAccount(*address)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find account at %s", req.Path)
+		log.Fatal(err)
+	}
+
+	log.Println("Balances for address:", address)
+	for _, balance := range stellarAccount.Balances {
+		log.Println(balance)
+	}
+
+	log.Print("Returning account...")
+	return &logical.Response{
+		Data: map[string]interface{}{
+			"address":  address,
+			"balances": stellarAccount.Balances,
+		},
+	}, nil
+}
+
+func (b *backend) readVaultAccount(ctx context.Context, req *logical.Request, path string) (*Account, error) {
+	log.Print("Reading account from path: " + path)
+	entry, err := req.Storage.Get(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find account at %s", path)
 	}
 	if entry == nil || len(entry.Value) == 0 {
 		return nil, fmt.Errorf("no account found in storage")
@@ -106,26 +131,24 @@ func (b *backend) readAccount(ctx context.Context, req *logical.Request, d *fram
 	err = entry.DecodeJSON(&account)
 
 	if entry == nil {
-		return nil, fmt.Errorf("failed to deserialize account at %s", req.Path)
+		return nil, fmt.Errorf("failed to deserialize account at %s", path)
 	}
 
+	return &account, err
+}
+
+func logBalances(account Account) {
 	address := &account.Address
 
-	//
-	//stellarAccount, err := horizon.DefaultTestNetClient.LoadAccount(address)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//log.Println("Balances for address:", address)
-	//for _, balance := range stellarAccount.Balances {
-	//	log.Println(balance)
-	//}
+	stellarAccount, err := horizon.DefaultTestNetClient.LoadAccount(*address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Balances for address:", address)
+	for _, balance := range stellarAccount.Balances {
+		log.Println(balance)
+	}
 	log.Print("Returning account...")
-	return &logical.Response{
-		Data: map[string]interface{}{
-			"address": address,
-		},
-	}, nil
 }
 
 func fundTestAccount(address string) error {
