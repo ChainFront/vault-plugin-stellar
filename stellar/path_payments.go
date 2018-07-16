@@ -5,7 +5,6 @@ import (
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 	"github.com/stellar/go/build"
-	"github.com/stellar/go/clients/horizon"
 	"log"
 )
 
@@ -15,6 +14,11 @@ func paymentsPaths(b *backend) []*framework.Path {
 			Pattern:      "payments",
 			HelpSynopsis: "Make a payment on the Stellar network",
 			Fields: map[string]*framework.FieldSchema{
+				"sequenceNum": &framework.FieldSchema{
+					Type:        framework.TypeInt,
+					Default:     0,
+					Description: "Sequence number for this transaction",
+				},
 				"source": &framework.FieldSchema{
 					Type:        framework.TypeString,
 					Description: "Source account",
@@ -46,6 +50,10 @@ func (b *backend) createPayment(ctx context.Context, req *logical.Request, d *fr
 	}
 
 	// Validate required fields are present
+	sequenceNum := d.Get("sequenceNum").(int)
+	if sequenceNum == 0 {
+		return errMissingField("sequenceNum"), nil
+	}
 	source := d.Get("source").(string)
 	if source == "" {
 		return errMissingField("source"), nil
@@ -79,7 +87,7 @@ func (b *backend) createPayment(ctx context.Context, req *logical.Request, d *fr
 	tx, err := build.Transaction(
 		build.SourceAccount{AddressOrSeed: sourceAddress},
 		build.TestNetwork,
-		build.AutoSequence{SequenceProvider: horizon.DefaultTestNetClient},
+		build.Sequence{uint64(sequenceNum)},
 		build.Payment(
 			build.Destination{AddressOrSeed: destinationAddress},
 			build.NativeAmount{Amount: amount},
