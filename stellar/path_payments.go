@@ -110,9 +110,13 @@ func (b *backend) createPayment(ctx context.Context, req *logical.Request, d *fr
 		log.Fatal(err)
 	}
 
-	// Sign the transaction
-	signedTx, err := tx.Sign(sourceAccount.Seed,
-		paymentChannelAccount.Seed)
+	// Sign the transaction with the necessary signatures
+	var signers []string
+	signers = append(signers, sourceAccount.Seed)
+	if paymentChannel != "" {
+		signers = append(signers, paymentChannelAccount.Seed)
+	}
+	signedTx, err := tx.Sign(signers...)
 	if err != nil {
 		log.Fatal(err)
 	}
