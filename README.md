@@ -32,6 +32,21 @@ it doesn't actually do anything since we're running on the Stellar testnet.
 
 ### Creating a Signed Payment Transaction
 
-`vault write stellar/payments sequenceNum=1 source=MySourceAccountName destination=MyDestinationAccountName amount=35`
+`vault write stellar/payments source=MySourceAccountName destination=MyDestinationAccountName amount=35`
 
 This will return a signed transaction with a payment operation to send 35 XLM from MySourceAccountName to MyDestinationAccountName.
+
+### Creating a Signed Payment Transaction Using a Payment Channel
+
+`vault write stellar/payments source=MySourceAccountName destination=MyDestinationAccountName paymentChannel=MyPaymentChannelAccountName amount=35`
+
+This will return a signed transaction with a payment operation to send 35 XLM from MySourceAccountName to MyDestinationAccountName. 
+The account MyPaymentChannelAccountName will be used for sequence numbers, and 
+will be added as a signer to the transaction.
+
+## Running Tests
+
+```
+cd stellar
+go test
+```
