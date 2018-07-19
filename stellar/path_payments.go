@@ -5,20 +5,17 @@ import (
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 	"github.com/stellar/go/build"
+	"github.com/stellar/go/clients/horizon"
 	"log"
 )
 
+// Register the callbacks for the paths exposed by these functions
 func paymentsPaths(b *backend) []*framework.Path {
 	return []*framework.Path{
 		&framework.Path{
 			Pattern:      "payments",
 			HelpSynopsis: "Make a payment on the Stellar network",
 			Fields: map[string]*framework.FieldSchema{
-				"sequenceNum": &framework.FieldSchema{
-					Type:        framework.TypeInt,
-					Default:     0,
-					Description: "Sequence number for this transaction",
-				},
 				"source": &framework.FieldSchema{
 					Type:        framework.TypeString,
 					Description: "Source account",
@@ -26,6 +23,10 @@ func paymentsPaths(b *backend) []*framework.Path {
 				"destination": &framework.FieldSchema{
 					Type:        framework.TypeString,
 					Description: "Destination account",
+				},
+				"paymentChannel": &framework.FieldSchema{
+					Type:        framework.TypeString,
+					Description: "Payment channel account",
 				},
 				"amount": &framework.FieldSchema{
 					Type:        framework.TypeString,
@@ -40,7 +41,7 @@ func paymentsPaths(b *backend) []*framework.Path {
 	}
 }
 
-// Using Vault's transit backend, generates and stores an ED25519 asymmetric key pair
+// Creates a signed transaction with a payment operation.
 func (b *backend) createPayment(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 
 	// Validate we didn't get extra fields
@@ -50,10 +51,6 @@ func (b *backend) createPayment(ctx context.Context, req *logical.Request, d *fr
 	}
 
 	// Validate required fields are present
-	sequenceNum := d.Get("sequenceNum").(int)
-	if sequenceNum == 0 {
-		return errMissingField("sequenceNum"), nil
-	}
 	source := d.Get("source").(string)
 	if source == "" {
 		return errMissingField("source"), nil
@@ -66,6 +63,9 @@ func (b *backend) createPayment(ctx context.Context, req *logical.Request, d *fr
 	if amount == "" {
 		return errMissingField("amount"), nil
 	}
+
+	// Read optional fields
+	paymentChannel := d.Get("paymentChannel").(string)
 
 	// Retrieve the source account keypair from vault storage
 	sourceAccount, err := b.readVaultAccount(ctx, req, "accounts/"+source)
@@ -81,14 +81,27 @@ func (b *backend) createPayment(ctx context.Context, req *logical.Request, d *fr
 	}
 	destinationAddress := destinationAccount.Address
 
+	// If the payment channel account is set, we'll use it, otherwise the source account is to be used
+	var paymentChannelAccount *Account
+	if paymentChannel != "" {
+		paymentChannelAccount, err = b.readVaultAccount(ctx, req, "accounts/"+paymentChannel)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		paymentChannelAccount = sourceAccount
+	}
+	paymentChannelAddress := paymentChannelAccount.Address
+
 	// Build the transaction
 	// TODO: multisig
 	// TODO: custom assets
 	tx, err := build.Transaction(
-		build.SourceAccount{AddressOrSeed: sourceAddress},
+		build.SourceAccount{AddressOrSeed: paymentChannelAddress},
 		build.TestNetwork,
-		build.Sequence{uint64(sequenceNum)},
+		build.AutoSequence{SequenceProvider: horizon.DefaultTestNetClient},
 		build.Payment(
+			build.SourceAccount{AddressOrSeed: sourceAddress},
 			build.Destination{AddressOrSeed: destinationAddress},
 			build.NativeAmount{Amount: amount},
 		),
@@ -98,7 +111,8 @@ func (b *backend) createPayment(ctx context.Context, req *logical.Request, d *fr
 	}
 
 	// Sign the transaction
-	signedTx, err := tx.Sign(sourceAccount.Seed)
+	signedTx, err := tx.Sign(sourceAccount.Seed,
+		paymentChannelAccount.Seed)
 	if err != nil {
 		log.Fatal(err)
 	}

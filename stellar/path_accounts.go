@@ -46,6 +46,7 @@ func accountsPaths(b *backend) []*framework.Path {
 	}
 }
 
+// Returns a list of stored accounts (does not validate that the account is valid on Stellar)
 func (b *backend) listAccounts(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	accountList, err := req.Storage.List(ctx, "accounts/")
 	if err != nil {
@@ -54,7 +55,7 @@ func (b *backend) listAccounts(ctx context.Context, req *logical.Request, d *fra
 	return logical.ListResponse(accountList), nil
 }
 
-// Using Vault's transit backend, generates and stores an ED25519 asymmetric key pair
+// Using Stellar's SDK, generates and stores an ED25519 asymmetric key pair
 func (b *backend) createAccount(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	random, err := keypair.Random()
 	if err != nil {
@@ -66,6 +67,10 @@ func (b *backend) createAccount(ctx context.Context, req *logical.Request, d *fr
 
 	log.Print("Public key : " + address)
 
+	// Prod anchor
+	//err = fundAccount(address)
+
+	// Testnet
 	err = fundTestAccount(address)
 	if err != nil {
 		log.Fatal(err)

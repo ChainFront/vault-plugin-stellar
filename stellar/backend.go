@@ -14,14 +14,14 @@ type backend struct {
 
 // Factory creates a new usable instance of this secrets engine.
 func Factory(ctx context.Context, c *logical.BackendConfig) (logical.Backend, error) {
-	b := Backend(c)
+	b := Backend()
 	if err := b.Setup(ctx, c); err != nil {
 		return nil, errors.Wrap(err, "Unable to set up Stellar secret backend")
 	}
 	return b, nil
 }
 
-func Backend(c *logical.BackendConfig) *backend {
+func Backend() *backend {
 	var b backend
 	b.Backend = &framework.Backend{
 		Help: "",
