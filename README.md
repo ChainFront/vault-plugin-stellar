@@ -30,6 +30,10 @@ it doesn't actually do anything since we're running on the Stellar testnet.
 
 `vault read stellar/accounts/MyAccountName`
 
+### Viewing All Account Names
+
+`vault list stellar/accounts`
+
 ### Creating a Signed Payment Transaction
 
 `vault write stellar/payments source=MySourceAccountName destination=MyDestinationAccountName amount=35`
